@@ -24,9 +24,10 @@ const app = new Hono();
 app.use("*", requestLogger);
 
 app.use("*", cors({
-  origin: env.FE_BASE_URL,
-  allowMethods: ["POST", "OPTIONS"],
-  allowHeaders: ["Content-Type", "X-Captcha-Token"],
+  origin: [env.FE_BASE_URL, "http://localhost:3000"],
+  allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowHeaders: ["Content-Type", "Authorization", "X-Captcha-Token"],
+  credentials: true,
 }));
 
 app.use("*", secureHeaders());
