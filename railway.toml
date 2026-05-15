@@ -1,0 +1,10 @@
+[build]
+dockerfilePath = "Dockerfile"
+
+[[services]]
+name = "api"
+startCommand = "bun run src/index.ts"
+
+[[services]]
+name = "worker"
+startCommand = "bun run src/queue/worker.ts"
