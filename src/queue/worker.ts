@@ -5,7 +5,7 @@ import { transactions, userDetail, userItems } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { createErpSalesOrder, registerOrGetCustomer } from "../services/erp.service";
 import { env } from "../lib/env";
-import type { ErpJobData, ErpItem } from "../types/index";
+import type { ErpJobData, ErpItem, ItemContent } from "../types/index";
 
 /**
  * BullMQ Worker — ERP Sales Order Processor
@@ -58,17 +58,37 @@ async function processErpJob(job: Job<ErpJobData>): Promise<void> {
   });
 
   // ─── Step 4: Map items to ERPNext format ─────────────────────────────
-  const erpItems: ErpItem[] = transaction.items.map((item) => ({
-    item_code: item.itemCode,
-    qty: item.quantity,
-    rate: 0, // Rate will be resolved by ERP from the selling price list
-    delivery_date: new Date(Date.now() + 6 * 86400_000)
-      .toISOString()
-      .split("T")[0]!,
-    warehouse: env.ERP_WAREHOUSE,
-    uom: "Pcs",
-    conversion_factor: 1,
-  }));
+  const deliveryDate = new Date(Date.now() + 6 * 86400_000).toISOString().split("T")[0]!;
+
+  const erpItems: ErpItem[] = transaction.items.flatMap((item) => {
+    const contents = (item.content as ItemContent[] | null) ?? [];
+
+    if (contents.length === 0) {
+      return [{
+        item_code: item.itemCode,
+        qty: item.quantity,
+        rate: 0,
+        delivery_date: deliveryDate,
+        warehouse: env.ERP_WAREHOUSE,
+        uom: "Pcs",
+        conversion_factor: 1,
+      }];
+    }
+
+    return contents.map((c) => ({
+      item_code: item.itemCode,
+      qty: 1,
+      rate: 0,
+      delivery_date: deliveryDate,
+      warehouse: env.ERP_WAREHOUSE,
+      uom: "Pcs",
+      conversion_factor: 1,
+      item_numbers: c.item_numbers,
+      item_address: c.item_address,
+      item_font: c.item_style.map((s) => s.item_font).join(", "),
+      font_style: c.item_style.map((s) => s.font_style).join(", "),
+    }));
+  });
 
   // ─── Step 5: Create the Sales Order in ERPNext ───────────────────────
   const erpResponse = await createErpSalesOrder(

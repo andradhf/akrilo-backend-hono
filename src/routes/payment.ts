@@ -29,6 +29,20 @@ const initiatePaymentSchema = z.object({
         item_code: z.string().min(1, "item_code is required"),
         item_name: z.string().min(1, "item_name is required"),
         quantity: z.number().int().positive("Quantity must be a positive integer"),
+        content: z
+            .array(
+              z.object({
+                item_numbers: z.string().min(1, "Item_numbers is rquired"),
+                item_address: z.string().min(1," Item_address is required"),
+                item_style: z
+                  .array(
+                    z.object({
+                      item_font: z.string().min(1, "item_font is required"),
+                      font_style: z.string().min(1, "font_style is reqired"),
+                    })
+                  )
+              })
+            )
       })
     )
     .min(1, "At least one item is required"),
@@ -87,6 +101,7 @@ paymentRoutes.post(
           item_code:  item.item_code,
           item_name:  item.item_name,
           quantity:   item.quantity,
+          content:    item.content,
           rate:       erpProduct.standard_rate,   // FROM ERP — never from client
           uom:        erpProduct.stock_uom ?? 'Pcs',
           warehouse:  env.ERP_WAREHOUSE,
@@ -129,6 +144,7 @@ paymentRoutes.post(
         itemCode: item.item_code,
         itemName: item.item_name,
         quantity: item.quantity,
+        content: item.content,
       }))
     );
 

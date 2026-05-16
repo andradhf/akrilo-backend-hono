@@ -61,6 +61,10 @@ export interface ErpItem {
   warehouse: string;
   uom: string;
   conversion_factor: number;
+  item_numbers?: string;
+  item_address?: string;
+  item_font?: string;
+  font_style?: string;
 }
 
 export interface ErpSalesOrderDoc {
@@ -113,6 +117,7 @@ export interface EnrichedItem {
   rate:      number;   // always from ERP
   uom:       string;
   warehouse: string;
+  content:   ItemContent[];
 }
 
 // =============================================================================
@@ -155,10 +160,22 @@ export interface UserInitiateResponse {
   erp_customer: string;
 }
 
+export interface ItemStyle {
+  item_font: string;
+  font_style: string;
+}
+
+export interface ItemContent {
+  item_numbers: string;
+  item_address: string;
+  item_style: ItemStyle[];
+}
+
 export interface InitiatePaymentItem {
   item_code: string;
   item_name: string;
   quantity: number;
+  content: ItemContent[];
 }
 
 export interface InitiatePaymentRequest {

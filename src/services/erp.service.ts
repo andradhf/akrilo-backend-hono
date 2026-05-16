@@ -120,7 +120,7 @@ export const registerOrGetCustomer = async (customer: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        customer_name:  customer.name,
+        customer_name:  `web - ${customer.name}`,
         customer_type:  'Individual',
         customer_group: 'Individual',
         territory:      'All Territories',

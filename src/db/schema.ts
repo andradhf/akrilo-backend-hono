@@ -1,4 +1,4 @@
-import { pgTable, pgEnum, text, integer, numeric, uuid, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, pgEnum, text, integer, numeric, uuid, timestamp, index, jsonb } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 // =============================================================================
@@ -75,6 +75,7 @@ export const userItems = pgTable(
     itemCode: text("item_code").notNull(),
     itemName: text("item_name").notNull(),
     quantity: integer("quantity").notNull(),
+    content: jsonb("content"),
     grantedAt: timestamp("granted_at", { withTimezone: true }),
   },
   (table) => [
