@@ -13,9 +13,10 @@ const envSchema = z.object({
   REDIS_PORT: z.coerce.number().default(6379),
   REDIS_PASSWORD: z.string().optional(),
 
-  // Xendit
-  XENDIT_SECRET_KEY: z.string().min(1, "XENDIT_SECRET_KEY is required"),
-  XENDIT_WEBHOOK_TOKEN: z.string().min(1, "XENDIT_WEBHOOK_TOKEN is required"),
+  // DOKU
+  DOKU_CLIENT_ID: z.string().min(1, "DOKU_CLIENT_ID is required"),
+  DOKU_SECRET_KEY: z.string().min(1, "DOKU_SECRET_KEY is required"),
+  DOKU_BASE_URL: z.string().url().default("https://api.doku.com"),
 
   // Captcha (Cloudflare Turnstile)
   TURNSTILE_SECRET_KEY: z.string().min(1),

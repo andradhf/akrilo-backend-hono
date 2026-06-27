@@ -1,52 +1,69 @@
 // =============================================================================
-// XENDIT TYPES
+// DOKU TYPES
 // =============================================================================
 
-export interface XenditInvoiceRequest {
-  external_id: string;
-  amount: number;
-  description: string;
-  invoice_duration?: number; // seconds, default 86400 (24h)
-  items?: XenditInvoiceItem[];
-  currency?: string;
-  success_redirect_url?: string;
-  failure_redirect_url?: string;
-}
-
-export interface XenditInvoiceItem {
+export interface DokuLineItem {
   name: string;
-  quantity: number;
   price: number;
-  category?: string;
+  quantity: number;
 }
 
-export interface XenditInvoiceResponse {
-  id: string;
-  external_id: string;
-  status: string;
+export interface DokuPaymentRequest {
+  invoice_number: string; // our transaction UUID — used to correlate webhook
   amount: number;
-  invoice_url: string;
-  expiry_date: string;
-  description: string;
+  currency: string;
+  callback_url: string;         // redirect after success
+  callback_url_cancel: string;  // redirect after cancel/failure
+  payment_due_date: number;     // minutes until expiry
+  line_items: DokuLineItem[];
+  customer: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+    address: string;
+  };
 }
 
-/**
- * Xendit Webhook Payload (Invoice Paid callback)
- * https://developers.xendit.co/api-reference/#invoice-callback
- */
-export interface XenditWebhookPayload {
-  id: string;
-  external_id: string;
-  status: "PAID" | "EXPIRED";
-  amount: number;
-  payer_email?: string;
-  paid_amount?: number;
-  paid_at?: string;
-  payment_method?: string;
-  payment_channel?: string;
-  payment_destination?: string;
-  currency?: string;
-  description?: string;
+export interface DokuPaymentResponse {
+  order: {
+    invoice_number: string;
+    amount: number;
+  };
+  payment: {
+    expired_date: string;
+    url: string;  // payment page URL — redirect user here
+    token: string;
+  };
+  customer: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+    address: string;
+  };
+}
+
+export interface DokuWebhookPayload {
+  order: {
+    invoice_number: string; // matches our transaction UUID
+    amount: number;
+  };
+  transaction: {
+    status: "SUCCESS" | "FAILED" | "EXPIRED";
+    date: string;
+    original_request_id: string;
+  };
+  payment: {
+    channel: string;
+    payment_due_date: string;
+  };
+  customer?: {
+    id: string;
+    name: string;
+    email?: string;
+    phone?: string;
+  };
 }
 
 // =============================================================================
@@ -54,6 +71,24 @@ export interface XenditWebhookPayload {
 // =============================================================================
 
 export interface ErpItem {
+  item_code: string;
+  qty: number;
+  rate: number;
+  item_numbers?: string;
+  item_address?: string;
+  item_font?: string;
+  font_style?: string;
+}
+
+export interface ErpSalesOrderRequest {
+  customer: string;
+  transaction_date: string;
+  delivery_date: string;
+  items: ErpItem[];
+}
+
+/* OLD ErpSalesOrderRequest — kept for reference
+export interface ErpItemOld {
   item_code: string;
   qty: number;
   rate: number;
@@ -80,12 +115,13 @@ export interface ErpSalesOrderDoc {
   price_list_currency: string;
   plc_conversion_rate: number;
   po_no: string;
-  items: ErpItem[];
+  items: ErpItemOld[];
 }
 
-export interface ErpSalesOrderRequest {
+export interface ErpSalesOrderRequestOld {
   doc: ErpSalesOrderDoc;
 }
+*/
 
 export interface ErpSalesOrderResponse {
   data: {

@@ -36,7 +36,7 @@ export const userDetail = pgTable("user_detail", {
 /**
  * transactions
  * Each record represents a single payment attempt.
- * The UUID `id` is used as Xendit's `external_id` for direct correlation.
+ * The UUID `id` is sent to DOKU as `order.invoice_number` for direct webhook correlation.
  */
 export const transactions = pgTable(
   "transactions",
@@ -45,8 +45,8 @@ export const transactions = pgTable(
     userId: integer("user_id")
       .notNull()
       .references(() => userDetail.id),
-    xenditExternalId: text("xendit_external_id").notNull().unique(),
-    xenditInvoiceId: text("xendit_invoice_id"),
+    paymentReferenceId: text("payment_reference_id").notNull().unique(),
+    paymentInvoiceToken: text("payment_invoice_token"),
     status: transactionStatusEnum("status").notNull().default("PENDING"),
     totalAmount: numeric("total_amount", { precision: 15, scale: 2 }).notNull(),
     invoiceUrl: text("invoice_url"),
@@ -55,7 +55,7 @@ export const transactions = pgTable(
   },
   (table) => [
     index("transactions_user_id_idx").on(table.userId),
-    index("transactions_xendit_external_id_idx").on(table.xenditExternalId),
+    index("transactions_payment_reference_id_idx").on(table.paymentReferenceId),
     index("transactions_status_idx").on(table.status),
   ]
 );

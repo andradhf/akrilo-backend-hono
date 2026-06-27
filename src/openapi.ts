@@ -154,7 +154,7 @@ export const openApiSpec = {
                     success: { type: "boolean", example: true },
                     invoice_url: {
                       type: "string",
-                      example: "https://checkout.xendit.co/web/...",
+                      example: "https://payment.doku.com/checkout/...",
                     },
                     transaction_id: {
                       type: "string",
