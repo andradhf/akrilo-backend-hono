@@ -1,6 +1,6 @@
 import { createHmac, createHash } from "crypto";
 import { env } from "../lib/env";
-import type { DokuPaymentRequest, DokuPaymentResponse } from "../types/index";
+import type { DokuPaymentRequest, DokuPaymentResponse, DokuPaymentApiResponse } from "../types/index";
 
 // =============================================================================
 // DOKU SIGNATURE HELPERS
@@ -39,7 +39,7 @@ function generateSignature(
     .update(component)
     .digest("base64");
 
-  return `HMAC SHA256:${hmac}`;
+  return `HMACSHA256=${hmac}`;
 }
 
 /**
@@ -75,7 +75,7 @@ export function verifyDokuWebhookSignature(
     .update(component)
     .digest("base64");
 
-  const expectedSignature = `HMAC SHA256:${expectedHmac}`;
+  const expectedSignature = `HMACSHA256=${expectedHmac}`;
 
   // Constant-time comparison to prevent timing attacks
   return expectedSignature === receivedSignature;
@@ -139,5 +139,6 @@ export async function createDokuPayment(
     throw new Error(`DOKU API error [${response.status}]: ${errorBody}`);
   }
 
-  return response.json() as Promise<DokuPaymentResponse>;
+  const data = await response.json() as DokuPaymentApiResponse;
+  return data.response;
 }

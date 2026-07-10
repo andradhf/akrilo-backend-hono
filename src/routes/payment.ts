@@ -175,7 +175,7 @@ paymentRoutes.post(
     await db
       .update(transactions)
       .set({
-        paymentInvoiceToken: dokuPayment.payment.token,
+        paymentInvoiceToken: dokuPayment.payment.token_id,
         invoiceUrl: dokuPayment.payment.url,
         updatedAt: new Date(),
       })

@@ -4,7 +4,7 @@ export const openApiSpec = {
     title: "Nomorku Bridge API",
     version: "1.0.0",
     description:
-      "Payment bridge between frontend, Xendit (payment gateway), and ERPNext.",
+      "Payment bridge between frontend, DOKU (payment gateway), and ERPNext.",
   },
   servers: [{ url: "" }],
   paths: {
@@ -111,7 +111,7 @@ export const openApiSpec = {
         tags: ["Payment"],
         summary: "Initiate a payment invoice",
         description:
-          "Creates a Xendit invoice for the given items. User must be registered first. Item prices are fetched from ERPNext — the client only provides item_code, item_name, and quantity.",
+          "Creates a DOKU payment page for the given items. User must be registered first. Item prices are fetched from ERPNext — the client only provides item_code, item_name, quantity, and content.",
         requestBody: {
           required: true,
           content: {
@@ -125,16 +125,50 @@ export const openApiSpec = {
                     example: "081234567890",
                     description: "Must match a registered user",
                   },
+                  email: {
+                    type: "string",
+                    format: "email",
+                    example: "budi@example.com",
+                    description: "Optional, defaults to noreply@akrilo.com",
+                  },
                   items: {
                     type: "array",
                     minItems: 1,
                     items: {
                       type: "object",
-                      required: ["item_code", "item_name", "quantity"],
+                      required: ["item_code", "item_name", "quantity", "content"],
                       properties: {
                         item_code: { type: "string", example: "ITEM-001" },
                         item_name: { type: "string", example: "Paket Belajar" },
                         quantity: { type: "integer", minimum: 1, example: 1 },
+                        content: {
+                          type: "array",
+                          minItems: 1,
+                          description: "Customization details for this item",
+                          items: {
+                            type: "object",
+                            required: ["item_numbers", "item_address", "item_style"],
+                            properties: {
+                              item_numbers: { type: "string", example: "12345" },
+                              item_address: {
+                                type: "string",
+                                example: "Jl. Contoh No. 1, Jakarta",
+                              },
+                              item_style: {
+                                type: "array",
+                                minItems: 1,
+                                items: {
+                                  type: "object",
+                                  required: ["item_font", "font_style"],
+                                  properties: {
+                                    item_font: { type: "string", example: "Arial" },
+                                    font_style: { type: "string", example: "Bold" },
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        },
                       },
                     },
                   },
@@ -145,7 +179,7 @@ export const openApiSpec = {
         },
         responses: {
           "201": {
-            description: "Invoice created",
+            description: "Payment page created",
             content: {
               "application/json": {
                 schema: {
@@ -175,16 +209,37 @@ export const openApiSpec = {
     "/api/payment/webhook": {
       post: {
         tags: ["Payment"],
-        summary: "Xendit webhook receiver",
+        summary: "DOKU webhook receiver",
         description:
-          "Called by Xendit when a payment status changes. Requires the `x-callback-token` header. Protected by 4-layer duplicate prevention (token + Redis SETNX + DB FOR UPDATE + status guard).",
+          "Called by DOKU when a payment status changes. Requires HMAC-SHA256 signature headers. Protected by 4-layer duplicate prevention (signature + Redis SETNX + DB FOR UPDATE + status guard).",
         parameters: [
           {
             in: "header",
-            name: "x-callback-token",
+            name: "Client-Id",
             required: true,
             schema: { type: "string" },
-            description: "Xendit webhook verification token",
+            description: "DOKU client ID (must match DOKU_CLIENT_ID)",
+          },
+          {
+            in: "header",
+            name: "Request-Id",
+            required: true,
+            schema: { type: "string" },
+            description: "Unique delivery ID, used as the Redis idempotency key",
+          },
+          {
+            in: "header",
+            name: "Request-Timestamp",
+            required: true,
+            schema: { type: "string" },
+            description: "ISO-8601 timestamp used in the signature component string",
+          },
+          {
+            in: "header",
+            name: "Signature",
+            required: true,
+            schema: { type: "string" },
+            description: "HMAC-SHA256 signature, format: HMAC SHA256:{base64}",
           },
         ],
         requestBody: {
@@ -194,19 +249,36 @@ export const openApiSpec = {
               schema: {
                 type: "object",
                 properties: {
-                  id: { type: "string", example: "579c8d61f23fa4ca35e52da4" },
-                  external_id: {
-                    type: "string",
-                    format: "uuid",
-                    description: "Matches transaction UUID",
+                  order: {
+                    type: "object",
+                    properties: {
+                      invoice_number: {
+                        type: "string",
+                        format: "uuid",
+                        description: "Matches transaction UUID",
+                      },
+                      amount: { type: "number", example: 150000 },
+                    },
                   },
-                  status: {
-                    type: "string",
-                    enum: ["PAID", "EXPIRED", "PENDING"],
-                    example: "PAID",
+                  transaction: {
+                    type: "object",
+                    properties: {
+                      status: {
+                        type: "string",
+                        enum: ["SUCCESS", "FAILED", "EXPIRED"],
+                        example: "SUCCESS",
+                      },
+                      date: { type: "string" },
+                      original_request_id: { type: "string" },
+                    },
                   },
-                  paid_amount: { type: "number", example: 150000 },
-                  currency: { type: "string", example: "IDR" },
+                  payment: {
+                    type: "object",
+                    properties: {
+                      channel: { type: "string" },
+                      payment_due_date: { type: "string" },
+                    },
+                  },
                 },
               },
             },
@@ -214,9 +286,9 @@ export const openApiSpec = {
         },
         responses: {
           "200": { description: "Webhook received (including duplicates)" },
-          "400": { description: "Invalid payload" },
-          "403": { description: "Invalid callback token" },
-          "500": { description: "Processing error — Xendit will retry" },
+          "400": { description: "Invalid JSON payload or missing invoice_number/Request-Id" },
+          "403": { description: "Missing headers or invalid signature" },
+          "500": { description: "Processing error — DOKU will retry" },
         },
       },
     },

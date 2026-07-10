@@ -38,8 +38,13 @@ function deliveryDate(daysFromNow: number = 6): string {
 // =============================================================================
 
 /**
- * Fetches item price details from ERPNext using get_item_details.
- * Called during payment initiation to get the authoritative price from the price list.
+ * Fetches item price details from ERPNext by querying the "Item Price" resource
+ * directly for the configured price list.
+ *
+ * NOTE: This bypasses erpnext.stock.get_item_details.get_item_details (which is
+ * broken on this ERP instance — throws "missing 1 required positional argument: 'ctx'").
+ * As a result, ERPNext Pricing Rules (qty breaks, discounts, etc.) are NOT applied —
+ * this returns the flat price_list_rate from the price list.
  *
  * @param itemCode - The ERPNext Item code
  * @returns Product details including price_list_rate as standard_rate
@@ -49,47 +54,51 @@ export const getProductFromERP = async (itemCode: string): Promise<ErpProduct> =
   const timeout    = setTimeout(() => controller.abort(), 10_000);
 
   try {
+    const filters = encodeURIComponent(
+      JSON.stringify([
+        ["item_code", "=", itemCode],
+        ["price_list", "=", env.ERP_SELLING_PRICE_LIST],
+        ["selling", "=", 1],
+      ])
+    );
+    const fields = encodeURIComponent(
+      JSON.stringify(["item_code", "item_name", "price_list_rate", "uom"])
+    );
+
     const res = await fetch(
-      `${env.ERP_BASE_URL}/api/method/erpnext.stock.get_item_details.get_item_details`,
+      `${env.ERP_BASE_URL}/api/resource/Item Price?filters=${filters}&fields=${fields}&limit_page_length=1`,
       {
-        method:  "POST",
         signal:  controller.signal,
-        headers: {
-          Authorization:  getAuthHeader(),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          args: {
-            item_code:        itemCode,
-            price_list:       env.ERP_SELLING_PRICE_LIST,
-            qty:              1,
-            uom:              "Pcs",
-            company:          env.ERP_COMPANY,
-            transaction_type: "selling",
-            doctype:          "Sales Order",
-          },
-        }),
+        headers: { Authorization: getAuthHeader() },
       }
     );
 
-    if (!res.ok) throw new Error(`ERP product lookup failed: ${res.status}`);
+    if (!res.ok) {
+      const errorBody = await res.text();
+      throw new Error(`ERP product lookup failed [${res.status}] for item_code "${itemCode}": ${errorBody}`);
+    }
 
     const data = await res.json() as {
-      message: {
+      data: Array<{
         item_code:       string;
         item_name:       string;
         price_list_rate: number;
         uom:             string;
-        stock_uom:       string;
-      };
+      }>;
     };
 
-    const msg = data.message;
+    const item = data.data[0];
+    if (!item) {
+      throw new Error(
+        `No price found for item_code "${itemCode}" in price list "${env.ERP_SELLING_PRICE_LIST}"`
+      );
+    }
+
     return {
       item_code:     itemCode,
-      item_name:     msg.item_name,
-      standard_rate: msg.price_list_rate,
-      stock_uom:     msg.uom ?? msg.stock_uom,
+      item_name:     item.item_name,
+      standard_rate: item.price_list_rate,
+      stock_uom:     item.uom ?? "Pcs",
     };
   } finally {
     clearTimeout(timeout);
@@ -128,6 +137,11 @@ export const registerOrGetCustomer = async (customer: {
       }
     );
 
+    if (!searchRes.ok) {
+      const errorBody = await searchRes.text();
+      throw new Error(`ERP customer search failed [${searchRes.status}]: ${errorBody}`);
+    }
+
     const searchData = await searchRes.json() as { data: Array<{ name: string; customer_name: string }> };
 
     if (searchData.data && searchData.data.length > 0) {
@@ -149,6 +163,11 @@ export const registerOrGetCustomer = async (customer: {
         mobile_no:      customer.phone,
       }),
     });
+
+    if (!createRes.ok) {
+      const errorBody = await createRes.text();
+      throw new Error(`ERP customer create failed [${createRes.status}]: ${errorBody}`);
+    }
 
     const created = await createRes.json() as { data: { customer_name: string } };
     return created.data.customer_name as string;
