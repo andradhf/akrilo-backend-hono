@@ -1,4 +1,3 @@
-import { ulid } from "ulid";
 import { env } from "../lib/env";
 import type {
   ErpSalesOrderRequest,
@@ -186,7 +185,8 @@ export async function createErpSalesOrder(
   transactionId: string,
   customerName: string,
   items: ErpItem[],
-  customBuyerMessage: string
+  customBuyerMessage: string,
+  poNo: string
 ): Promise<ErpSalesOrderResponse> {
   const url = `${env.ERP_BASE_URL}/api/resource/Sales Order`;
 
@@ -199,7 +199,7 @@ export async function createErpSalesOrder(
     company:               env.ERP_COMPANY,
     transaction_date:      baseDate,
     delivery_date:         deliveryDate(9),
-    po_no:                 `PO-${ulid()}`,
+    po_no:                 poNo,
     po_date:               baseDate,
     currency:               env.ERP_CURRENCY,
     selling_price_list:    env.ERP_SELLING_PRICE_LIST,

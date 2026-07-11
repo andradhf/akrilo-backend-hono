@@ -1,4 +1,5 @@
 import { Worker, type Job } from "bullmq";
+import { ulid } from "ulid";
 import { createRedisConnection } from "./connection";
 import { db } from "../db/index";
 import { transactions, userDetail, userItems } from "../db/schema";
@@ -96,22 +97,30 @@ async function processErpJob(job: Job<ErpJobData>): Promise<void> {
     .join("\n");
 
   // ─── Step 5: Create the Sales Order in ERPNext ───────────────────────
+  const poNo = `PO-${ulid()}`;
+
   const erpResponse = await createErpSalesOrder(
     transactionId,
     erpCustomerName,   // verified ERP customer name
     erpItems,
-    customBuyerMessage
+    customBuyerMessage,
+    poNo
   );
 
   console.log(
     `[Worker] ✅ Sales Order created in ERP: ${erpResponse.data.name} — transaction: ${transactionId}`
   );
 
-  // ─── Step 6: Mark items as granted ───────────────────────────────────────
+  // ─── Step 6: Mark items as granted + persist po_no ────────────────────
   await db
     .update(userItems)
     .set({ grantedAt: new Date() })
     .where(eq(userItems.transactionId, transactionId));
+
+  await db
+    .update(transactions)
+    .set({ poNo })
+    .where(eq(transactions.id, transactionId));
 }
 
 // =============================================================================

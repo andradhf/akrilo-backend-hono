@@ -50,6 +50,7 @@ export const transactions = pgTable(
     status: transactionStatusEnum("status").notNull().default("PENDING"),
     totalAmount: numeric("total_amount", { precision: 15, scale: 2 }).notNull(),
     invoiceUrl: text("invoice_url"),
+    poNo: text("po_no"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
