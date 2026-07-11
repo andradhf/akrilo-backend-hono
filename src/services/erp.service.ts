@@ -149,19 +149,23 @@ export const registerOrGetCustomer = async (customer: {
     }
 
     // Not found — create new customer
+    const createBody = {
+      customer_name:  `web - ${customer.name}`,
+      customer_type:  'Individual',
+      customer_group: 'Individual',
+      territory:      'All Territories',
+      mobile_no:      customer.phone,
+    };
+
+    console.log(`[ERP] Creating customer:`, JSON.stringify(createBody));
+
     const createRes = await fetch(`${env.ERP_BASE_URL}/api/resource/Customer`, {
       method: 'POST',
       headers: {
         Authorization:  getAuthHeader(),
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        customer_name:  `web - ${customer.name}`,
-        customer_type:  'Individual',
-        customer_group: 'Individual',
-        territory:      'All Territories',
-        mobile_no:      customer.phone,
-      }),
+      body: JSON.stringify(createBody),
     });
 
     if (!createRes.ok) {
@@ -208,6 +212,8 @@ export async function createErpSalesOrder(
     custom_buyer_message:  customBuyerMessage,
     items,
   };
+
+  console.log(`[ERP] Creating Sales Order for transaction ${transactionId}:`, JSON.stringify(requestBody));
 
   const response = await fetch(url, {
     method: "POST",
