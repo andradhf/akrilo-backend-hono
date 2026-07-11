@@ -1,6 +1,6 @@
 import { Queue } from "bullmq";
 import { createRedisConnection } from "./connection";
-import type { ErpJobData } from "../types/index";
+import type { ErpJobData, WaJobData } from "../types/index";
 
 /**
  * BullMQ Queue instance for ERP Sales Order creation jobs.
@@ -42,4 +42,44 @@ export async function addErpJob(
   });
 
   console.log(`[Queue] Enqueued ERP job for transaction: ${transactionId}`);
+}
+
+/**
+ * BullMQ Queue instance for WhatsApp notification jobs.
+ *
+ * Kept separate from erpQueue so a WhatsApp send failure only retries the
+ * message — it never re-triggers Sales Order creation in ERP.
+ */
+export const waQueue = new Queue<WaJobData>("waQueue", {
+  connection: createRedisConnection(),
+  defaultJobOptions: {
+    // Retry up to 3 times with exponential backoff
+    attempts: 3,
+    backoff: {
+      type: "exponential",
+      delay: 5000, // 5s → 10s → 20s
+    },
+    // Keep completed jobs for monitoring (last 1000)
+    removeOnComplete: { count: 1000 },
+    // Keep failed jobs for debugging (last 5000)
+    removeOnFail: { count: 5000 },
+  },
+});
+
+/**
+ * Adds a WhatsApp order-confirmation job to the queue.
+ * Only call this after the Sales Order has been created successfully.
+ *
+ * @param phone - The user's phone number
+ * @param poNo  - The PO number generated for the Sales Order
+ */
+export async function addWaJob(phone: string, poNo: string): Promise<void> {
+  const jobData: WaJobData = { phone, poNo };
+
+  await waQueue.add("send-order-confirmation", jobData, {
+    // Use poNo as the job ID for deduplication within BullMQ
+    jobId: `wa-${poNo}`,
+  });
+
+  console.log(`[Queue] Enqueued WhatsApp job for PO: ${poNo}`);
 }

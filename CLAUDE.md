@@ -82,4 +82,6 @@ All env vars are validated at startup via Zod in `src/lib/env.ts`. The app will 
 
 ERP auth uses Frappe token format: `token API_KEY:API_SECRET`. Xendit uses HTTP Basic Auth with Secret Key as username and empty password.
 
-claude --resume f8145749-40b5-4d0b-9d2b-da45e29d38fc
+claude --resume f8145749-40b5-4d0b-9d2b-da45e29d38fc | doku integration
+
+claude --resume 9e020b32-c7bf-453d-99b1-3fa552f965b0 | whatsapp building

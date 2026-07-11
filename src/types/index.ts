@@ -195,6 +195,11 @@ export interface ErpJobData {
   userId: number;
 }
 
+export interface WaJobData {
+  phone: string;
+  poNo: string;
+}
+
 // =============================================================================
 // REQUEST / RESPONSE TYPES
 // =============================================================================

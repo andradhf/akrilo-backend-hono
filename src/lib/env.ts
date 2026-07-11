@@ -33,6 +33,11 @@ const envSchema = z.object({
   ERP_SELLING_PRICE_LIST: z.string().default("Standard Selling"),
   ERP_CURRENCY: z.string().default("IDR"),
 
+  // Fonnte (WhatsApp)
+  FONNTE_TOKEN: z.string().min(1, "FONNTE_TOKEN is required"),
+  FONNTE_API_URL: z.string().url().default("https://api.fonnte.com/send"),
+  DESIGN_URL: z.string().url().default("https://design.akrilocreations.com"),
+
   // Server
   PORT: z.coerce.number().default(3000),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),

@@ -1,11 +1,13 @@
 import { Worker, type Job } from "bullmq";
 import { ulid } from "ulid";
 import { createRedisConnection } from "./connection";
+import { addWaJob } from "./producer";
 import { db } from "../db/index";
 import { transactions, userDetail, userItems } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { createErpSalesOrder, registerOrGetCustomer } from "../services/erp.service";
-import type { ErpJobData, ErpItem, ItemContent } from "../types/index";
+import { sendWhatsappMessage, buildOrderConfirmationMessage } from "../services/whatsapp.service";
+import type { ErpJobData, ErpItem, ItemContent, WaJobData } from "../types/index";
 
 /**
  * BullMQ Worker — ERP Sales Order Processor
@@ -70,17 +72,16 @@ async function processErpJob(job: Job<ErpJobData>): Promise<void> {
         rate:              0,
         uom:               "Pcs",
         conversion_factor: 1,
-        item_numbers:      item.itemCode,
       }];
     }
 
-    return contents.map(() => ({
+    return contents.map((c) => ({
       item_code:         item.itemCode,
       qty:               1,
       rate:              0,
       uom:               "Pcs",
       conversion_factor: 1,
-      item_numbers:      item.itemCode,
+      item_numbers:      c.item_numbers,
     }));
   });
 
@@ -121,6 +122,25 @@ async function processErpJob(job: Job<ErpJobData>): Promise<void> {
     .update(transactions)
     .set({ poNo })
     .where(eq(transactions.id, transactionId));
+
+  // ─── Step 7: Enqueue WhatsApp notification (SO already succeeded) ─────
+  // Enqueue failures are swallowed on purpose — retrying this job would
+  // re-run createErpSalesOrder and create a duplicate Sales Order in ERP.
+  try {
+    await addWaJob(user.phone, poNo);
+  } catch (err) {
+    console.error(`[Worker] Failed to enqueue WhatsApp job for PO ${poNo}:`, err);
+  }
+}
+
+async function processWaJob(job: Job<WaJobData>): Promise<void> {
+  const { phone, poNo } = job.data;
+
+  console.log(`[Worker] Sending WhatsApp confirmation for PO ${poNo}`);
+
+  await sendWhatsappMessage(phone, buildOrderConfirmationMessage(poNo));
+
+  console.log(`[Worker] ✅ WhatsApp confirmation sent — PO: ${poNo}`);
 }
 
 // =============================================================================
@@ -132,6 +152,16 @@ const worker = new Worker<ErpJobData>("erpQueue", processErpJob, {
   concurrency: 5,
   limiter: {
     // Rate-limit ERP calls to protect the ERP server from burst traffic
+    max: 10,
+    duration: 1000, // max 10 jobs per second
+  },
+});
+
+const waWorker = new Worker<WaJobData>("waQueue", processWaJob, {
+  connection: createRedisConnection(),
+  concurrency: 5,
+  limiter: {
+    // Rate-limit outbound WhatsApp sends to stay under Fonnte's limits
     max: 10,
     duration: 1000, // max 10 jobs per second
   },
@@ -154,7 +184,23 @@ worker.on("error", (error) => {
   console.error("[Worker] Worker error:", error);
 });
 
+waWorker.on("completed", (job) => {
+  console.log(`[Worker] ✅ WA job ${job.id} completed`);
+});
+
+waWorker.on("failed", (job, error) => {
+  console.error(
+    `[Worker] ❌ WA job ${job?.id} failed (attempt ${job?.attemptsMade}/${job?.opts.attempts}):`,
+    error.message
+  );
+});
+
+waWorker.on("error", (error) => {
+  console.error("[Worker] WA worker error:", error);
+});
+
 console.log("[Worker] 🚀 ERP queue worker started, listening for jobs...");
+console.log("[Worker] 🚀 WhatsApp queue worker started, listening for jobs...");
 
 // =============================================================================
 // GRACEFUL SHUTDOWN
@@ -164,9 +210,9 @@ async function shutdown(signal: string) {
   console.log(`[Worker] Received ${signal}. Shutting down gracefully...`);
 
   // Wait for the current job to finish before exiting
-  await worker.close();
+  await Promise.all([worker.close(), waWorker.close()]);
 
-  console.log("[Worker] Worker closed. Exiting.");
+  console.log("[Worker] Workers closed. Exiting.");
   process.exit(0);
 }
 
