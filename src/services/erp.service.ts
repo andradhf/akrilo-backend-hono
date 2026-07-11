@@ -1,3 +1,4 @@
+import { ulid } from "ulid";
 import { env } from "../lib/env";
 import type {
   ErpSalesOrderRequest,
@@ -184,14 +185,27 @@ export const registerOrGetCustomer = async (customer: {
 export async function createErpSalesOrder(
   transactionId: string,
   customerName: string,
-  items: ErpItem[]
+  items: ErpItem[],
+  customBuyerMessage: string
 ): Promise<ErpSalesOrderResponse> {
   const url = `${env.ERP_BASE_URL}/api/resource/Sales Order`;
 
+  const baseDate = todayDate();
+  const currentYear = new Date().getFullYear();
+
   const requestBody: ErpSalesOrderRequest = {
-    customer:         customerName,
-    transaction_date: todayDate(),
-    delivery_date:    deliveryDate(6),
+    naming_series:        `SAL-ORD-${currentYear}-`,
+    customer:              customerName,
+    company:               env.ERP_COMPANY,
+    transaction_date:      baseDate,
+    delivery_date:         deliveryDate(9),
+    po_no:                 `PO-${ulid()}`,
+    po_date:               baseDate,
+    currency:               env.ERP_CURRENCY,
+    selling_price_list:    env.ERP_SELLING_PRICE_LIST,
+    price_list_currency:   env.ERP_CURRENCY,
+    order_type:            "Sales",
+    custom_buyer_message:  customBuyerMessage,
     items,
   };
 

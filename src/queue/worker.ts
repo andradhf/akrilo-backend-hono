@@ -64,28 +64,43 @@ async function processErpJob(job: Job<ErpJobData>): Promise<void> {
 
     if (contents.length === 0) {
       return [{
-        item_code: item.itemCode,
-        qty:       item.quantity,
-        rate:      0,
+        item_code:         item.itemCode,
+        qty:               item.quantity,
+        rate:              0,
+        uom:               "Pcs",
+        conversion_factor: 1,
+        item_numbers:      item.itemCode,
       }];
     }
 
-    return contents.map((c) => ({
-      item_code:    item.itemCode,
-      qty:          1,
-      rate:         0,
-      item_numbers: c.item_numbers,
-      item_address: c.item_address,
-      item_font:    c.item_style.map((s) => s.item_font).join(", "),
-      font_style:   c.item_style.map((s) => s.font_style).join(", "),
+    return contents.map(() => ({
+      item_code:         item.itemCode,
+      qty:               1,
+      rate:              0,
+      uom:               "Pcs",
+      conversion_factor: 1,
+      item_numbers:      item.itemCode,
     }));
   });
+
+  // ─── Step 4b: Build the buyer message from all content entries ───────
+  // Address/font/style used to live per line-item — now they're combined
+  // into one order-level message, one line per content entry.
+  const customBuyerMessage = transaction.items
+    .flatMap((item) => (item.content as ItemContent[] | null) ?? [])
+    .map((c) => {
+      const fonts  = c.item_style.map((s) => s.item_font).join(", ");
+      const styles = c.item_style.map((s) => s.font_style).join(", ");
+      return `Address: ${c.item_address} | Font: ${fonts} | Style: ${styles}`;
+    })
+    .join("\n");
 
   // ─── Step 5: Create the Sales Order in ERPNext ───────────────────────
   const erpResponse = await createErpSalesOrder(
     transactionId,
     erpCustomerName,   // verified ERP customer name
-    erpItems
+    erpItems,
+    customBuyerMessage
   );
 
   console.log(

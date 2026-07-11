@@ -84,16 +84,24 @@ export interface ErpItem {
   item_code: string;
   qty: number;
   rate: number;
+  uom: string;
+  conversion_factor: number;
   item_numbers?: string;
-  item_address?: string;
-  item_font?: string;
-  font_style?: string;
 }
 
 export interface ErpSalesOrderRequest {
+  naming_series: string;
   customer: string;
+  company: string;
   transaction_date: string;
   delivery_date: string;
+  po_no: string;
+  po_date: string;
+  currency: string;
+  selling_price_list: string;
+  price_list_currency: string;
+  order_type: string;
+  custom_buyer_message: string;
   items: ErpItem[];
 }
 

@@ -81,3 +81,5 @@ This is a **payment bridge** between a frontend, Xendit (payment gateway), and E
 All env vars are validated at startup via Zod in `src/lib/env.ts`. The app will refuse to start if any required variable is missing. See `.env.example` for all required variables.
 
 ERP auth uses Frappe token format: `token API_KEY:API_SECRET`. Xendit uses HTTP Basic Auth with Secret Key as username and empty password.
+
+claude --resume f8145749-40b5-4d0b-9d2b-da45e29d38fc
