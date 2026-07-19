@@ -23,7 +23,6 @@ import type {
 
 const initiatePaymentSchema = z.object({
   phone: z.string().regex(/^(\+62|62|0)8[1-9][0-9]{6,10}$/, 'Format nomor HP tidak valid'),
-  email: z.string().email("Format email tidak valid").optional().default("noreply@akrilo.com"),
   items: z
     .array(
       z.object({
@@ -165,7 +164,7 @@ paymentRoutes.post(
       customer: {
         id: String(user.id),
         name: user.name,
-        email: body.email,
+        email: user.email,
         phone: user.phone,
         address: user.address,
       },

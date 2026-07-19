@@ -29,6 +29,7 @@ export const userDetail = pgTable("user_detail", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   name: text("name").notNull(),
   phone: text("phone").notNull().unique(),
+  email: text("email").notNull(),
   address: text("address").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });

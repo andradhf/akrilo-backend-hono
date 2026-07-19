@@ -16,6 +16,7 @@ const userInitiateSchema = z.object({
   user: z.object({
     name: z.string().min(1, "User name is required"),
     phone: z.string().regex(/^(\+62|62|0)8[1-9][0-9]{6,10}$/, 'Format nomor HP tidak valid'),
+    email: z.string().email("Format email tidak valid"),
     address: z.string().min(10).max(500),
   }),
 });
@@ -58,17 +59,19 @@ userRoutes.post(
         .values({
           name: body.user.name,
           phone: body.user.phone,
+          email: body.user.email,
           address: body.user.address,
         })
         .returning();
 
       user = insertedUser;
     } else {
-      // Update name and address on existing user
+      // Update name, email, and address on existing user
       await db
         .update(userDetail)
         .set({
           name: body.user.name,
+          email: body.user.email,
           address: body.user.address,
         })
         .where(eq(userDetail.phone, body.user.phone));

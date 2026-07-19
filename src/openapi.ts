@@ -54,13 +54,18 @@ export const openApiSpec = {
                 properties: {
                   user: {
                     type: "object",
-                    required: ["name", "phone", "address"],
+                    required: ["name", "phone", "email", "address"],
                     properties: {
                       name: { type: "string", example: "Budi Santoso" },
                       phone: {
                         type: "string",
                         example: "081234567890",
                         description: "Indonesian phone number (+62 / 62 / 0 prefix)",
+                      },
+                      email: {
+                        type: "string",
+                        format: "email",
+                        example: "budi@example.com",
                       },
                       address: {
                         type: "string",
@@ -123,13 +128,7 @@ export const openApiSpec = {
                   phone: {
                     type: "string",
                     example: "081234567890",
-                    description: "Must match a registered user",
-                  },
-                  email: {
-                    type: "string",
-                    format: "email",
-                    example: "budi@example.com",
-                    description: "Optional, defaults to noreply@akrilo.com",
+                    description: "Must match a registered user. The user's email (registered via /api/user/initiate) is used automatically — not accepted here.",
                   },
                   items: {
                     type: "array",

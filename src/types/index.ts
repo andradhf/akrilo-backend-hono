@@ -182,6 +182,7 @@ export interface UserDetail {
   id:         number;
   name:       string;
   phone:      string;
+  email:      string;
   address:    string;
   created_at: Date;
 }
@@ -208,6 +209,7 @@ export interface UserInitiateRequest {
   user: {
     name: string;
     phone: string;
+    email: string;
     address: string;
   };
 }
