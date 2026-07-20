@@ -1,14 +1,18 @@
+// Unused since the notification channel was swapped from WhatsApp (Fonnte) to
+// email (Mailtrap) — see src/services/email.service.ts. Kept for reference,
+// commented out because FONNTE_TOKEN/FONNTE_API_URL were removed from env.ts.
+/*
 import { env } from "../lib/env";
 
 /**
  * Fonnte WhatsApp API client.
  * Docs: https://docs.fonnte.com
- */
+ *\/
 
 /**
  * Normalizes an Indonesian phone number to the "62xxx" format Fonnte expects.
  * Numbers in our DB can be stored as +62/62/0-prefixed (see regex in routes/user.ts).
- */
+ *\/
 function normalizePhone(phone: string): string {
   const digits = phone.replace(/\D/g, "");
   if (digits.startsWith("0")) return `62${digits.slice(1)}`;
@@ -19,7 +23,7 @@ function normalizePhone(phone: string): string {
 /**
  * Sends a WhatsApp message via Fonnte.
  * Throws on HTTP failure or Fonnte-reported failure, so BullMQ can retry.
- */
+ *\/
 export async function sendWhatsappMessage(phone: string, message: string): Promise<void> {
   const controller = new AbortController();
   const timeout    = setTimeout(() => controller.abort(), 10_000);
@@ -57,7 +61,7 @@ export async function sendWhatsappMessage(phone: string, message: string): Promi
 /**
  * Builds the "order confirmed, check your design" message sent after a
  * Sales Order is successfully created in ERP.
- */
+ *\/
 export function buildOrderConfirmationMessage(poNo: string): string {
   return [
     "Terima kasih sudah membeli. Silakan cek design terlebih dahulu.",
@@ -65,3 +69,4 @@ export function buildOrderConfirmationMessage(poNo: string): string {
     env.DESIGN_URL,
   ].join("\n");
 }
+*/

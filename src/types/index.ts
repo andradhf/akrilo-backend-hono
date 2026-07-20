@@ -196,8 +196,8 @@ export interface ErpJobData {
   userId: number;
 }
 
-export interface WaJobData {
-  phone: string;
+export interface EmailJobData {
+  email: string;
   poNo: string;
 }
 
