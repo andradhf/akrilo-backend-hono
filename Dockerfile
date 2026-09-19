@@ -8,6 +8,7 @@ RUN bun install --frozen-lockfile --production
 FROM base AS final
 COPY --from=deps /app/node_modules ./node_modules
 COPY src ./src
+COPY drizzle ./drizzle
 COPY tsconfig.json ./
 
 # CMD is overridden per-service in railway.toml

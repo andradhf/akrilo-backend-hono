@@ -28,10 +28,10 @@ There are no tests in this project.
 
 ## Architecture
 
-This is a **payment bridge** between a frontend, Xendit (payment gateway), and ERPNext (ERP system). It runs two separate processes that must both be running in production:
+This is a **payment bridge** between a frontend, DOKU (payment gateway), and ERPNext (ERP system), with Mailtrap for order-confirmation emails. It runs two separate processes that must both be running in production:
 
 1. **HTTP server** (`src/index.ts`) — Hono app on Bun
-2. **BullMQ worker** (`src/queue/worker.ts`) — ERP job processor
+2. **BullMQ worker** (`src/queue/worker.ts`) — ERP job + email job processor
 
 ### Request Flow
 
@@ -45,43 +45,41 @@ This is a **payment bridge** between a frontend, Xendit (payment gateway), and E
 - Look up user by phone (must be registered first)
 - Fetch authoritative item prices from ERP (prices never come from client)
 - Insert `transactions` (PENDING) + `user_items` rows
-- Call Xendit Invoice API → update transaction with invoice ID and URL
+- Call DOKU checkout API → update transaction with payment token and payment URL
 - Return `invoice_url` to client for redirect
 
-**Xendit Webhook** (`POST /api/payment/webhook`):
-- 4-layer duplicate protection:
-  1. `x-callback-token` header verification
-  2. Redis `SETNX` idempotency key (24h TTL)
+**DOKU Webhook** (`POST /api/payment/webhook`):
+- 4-layer duplicate/fraud protection:
+  1. HMAC-SHA256 signature verification (`Client-Id` + `Request-Id` + `Request-Timestamp` + body digest, per `src/services/doku.service.ts`)
+  2. Redis `SETNX` idempotency key on DOKU's `Request-Id` header (24h TTL)
   3. PostgreSQL `SELECT ... FOR UPDATE` row lock
   4. Status guard (skip if already PAID)
-- On confirmed payment: mark transaction PAID, enqueue BullMQ job
+- Only `transaction.status === "SUCCESS"` payloads are processed; FAILED/EXPIRED are ignored
+- On confirmed payment: mark transaction PAID, enqueue `erpQueue` job
 
-**BullMQ Worker** (standalone process):
-- Picks up `erpQueue` jobs after webhook confirms payment
-- Registers/finds ERP customer, creates Sales Order in ERPNext
-- Marks `user_items.granted_at` on success
-- Retry: 3 attempts, exponential backoff (5s → 10s → 20s)
+**BullMQ Worker** (standalone process, `src/queue/worker.ts`):
+- `erpQueue`: picked up after webhook confirms payment. Registers/finds ERP customer, builds line items (each `user_items.content` entry becomes one ERP line item; falls back to a single zero-rate line if no content), creates a Sales Order in ERPNext with a generated `po_no` (`PO-<ulid>`), marks `user_items.granted_at`, persists `po_no`, then enqueues an `emailQueue` job. Email enqueue failures are swallowed on purpose — retrying the ERP job would create a duplicate Sales Order.
+- `emailQueue`: sends the order-confirmation email via Mailtrap (`src/services/email.service.ts`). Kept as a separate queue/job so an email failure never re-triggers Sales Order creation.
+- Retry: 3 attempts, exponential backoff (5s → 10s → 20s), for both queues.
 
 ### Infrastructure
 
 - **Database**: PostgreSQL via `drizzle-orm` + `postgres` (postgres-js)
 - **Queue**: Redis via `ioredis` + `bullmq`
 - **Schema**: `src/db/schema.ts` — three tables: `user_detail`, `transactions`, `user_items`
-- **Transaction UUID** doubles as `xendit_external_id` for direct webhook correlation
+- **Transaction UUID** doubles as DOKU's `order.invoice_number` for direct webhook correlation
 
 ### Key Design Decisions
 
-- Item prices are **always fetched from ERP** at payment initiation — the client only sends `item_code`, `item_name`, and `quantity`.
+- Item prices are **always fetched from ERP** at payment initiation — the client only sends `item_code`, `item_name`, `quantity`, and design `content`. `getProductFromERP` queries the `Item Price` resource directly (not `get_item_details`, which is broken on this ERP instance), so ERPNext pricing rules (qty breaks, discounts) are **not** applied.
 - The webhook handler uses raw `postgres-js` SQL (`queryClient.begin`) for `SELECT ... FOR UPDATE` because Drizzle ORM doesn't support it natively. Drizzle is used everywhere else.
 - The BullMQ ERP job is enqueued **after** the DB transaction commits (outside `queryClient.begin`) to avoid enqueueing on a rolled-back write.
-- On webhook processing errors, the Redis idempotency key is deleted so Xendit retries can reprocess.
+- On webhook processing errors, the Redis idempotency key is deleted so DOKU retries can reprocess.
+- WhatsApp notifications (Fonnte) were replaced by email (Mailtrap): `src/services/whatsapp.service.ts` is fully commented out and kept only for reference; `FONNTE_TOKEN`/`FONNTE_API_URL` are not in `src/lib/env.ts`. Don't re-enable it without re-adding those env vars.
+- `src/services/erp.service.ts` keeps an old, unused `createErpSalesOrderOld` implementation commented out at the bottom for reference — the active `createErpSalesOrder` uses the newer request shape (`naming_series`, `custom_buyer_message`, etc.).
 
 ### Environment
 
 All env vars are validated at startup via Zod in `src/lib/env.ts`. The app will refuse to start if any required variable is missing. See `.env.example` for all required variables.
 
-ERP auth uses Frappe token format: `token API_KEY:API_SECRET`. Xendit uses HTTP Basic Auth with Secret Key as username and empty password.
-
-claude --resume f8145749-40b5-4d0b-9d2b-da45e29d38fc | doku integration
-
-claude --resume 9e020b32-c7bf-453d-99b1-3fa552f965b0 | whatsapp building
+ERP auth uses Frappe token format: `token API_KEY:API_SECRET`. DOKU requests are signed with HMAC-SHA256 over `Client-Id`/`Request-Id`/`Request-Timestamp`/`Request-Target`/body-digest, using `DOKU_SECRET_KEY` (see `src/services/doku.service.ts` for the exact component-string format — the same signing scheme is reused to verify incoming webhooks).

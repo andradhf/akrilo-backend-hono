@@ -3,7 +3,7 @@ dockerfilePath = "Dockerfile"
 
 [[services]]
 name = "api"
-startCommand = "bun run src/index.ts"
+startCommand = "bun run src/db/migrate.ts && bun run src/index.ts"
 
 [[services]]
 name = "worker"
