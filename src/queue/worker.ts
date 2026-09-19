@@ -1,13 +1,13 @@
 import { Worker, type Job } from "bullmq";
 import { ulid } from "ulid";
 import { createRedisConnection } from "./connection";
-import { addWaJob } from "./producer";
+import { addEmailJob } from "./producer";
 import { db } from "../db/index";
 import { transactions, userDetail, userItems } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { createErpSalesOrder, registerOrGetCustomer } from "../services/erp.service";
-import { sendWhatsappMessage, buildOrderConfirmationMessage } from "../services/whatsapp.service";
-import type { ErpJobData, ErpItem, ItemContent, WaJobData } from "../types/index";
+import { sendEmailMessage, buildOrderConfirmationEmail } from "../services/email.service";
+import type { ErpJobData, ErpItem, ItemContent, EmailJobData } from "../types/index";
 
 /**
  * BullMQ Worker — ERP Sales Order Processor
@@ -123,24 +123,25 @@ async function processErpJob(job: Job<ErpJobData>): Promise<void> {
     .set({ poNo })
     .where(eq(transactions.id, transactionId));
 
-  // ─── Step 7: Enqueue WhatsApp notification (SO already succeeded) ─────
+  // ─── Step 7: Enqueue confirmation email (SO already succeeded) ────────
   // Enqueue failures are swallowed on purpose — retrying this job would
   // re-run createErpSalesOrder and create a duplicate Sales Order in ERP.
   try {
-    await addWaJob(user.phone, poNo);
+    await addEmailJob(user.email, poNo);
   } catch (err) {
-    console.error(`[Worker] Failed to enqueue WhatsApp job for PO ${poNo}:`, err);
+    console.error(`[Worker] Failed to enqueue email job for PO ${poNo}:`, err);
   }
 }
 
-async function processWaJob(job: Job<WaJobData>): Promise<void> {
-  const { phone, poNo } = job.data;
+async function processEmailJob(job: Job<EmailJobData>): Promise<void> {
+  const { email, poNo } = job.data;
 
-  console.log(`[Worker] Sending WhatsApp confirmation for PO ${poNo}`);
+  console.log(`[Worker] Sending confirmation email for PO ${poNo}`);
 
-  await sendWhatsappMessage(phone, buildOrderConfirmationMessage(poNo));
+  const { subject, html } = buildOrderConfirmationEmail(poNo);
+  await sendEmailMessage(email, subject, html);
 
-  console.log(`[Worker] ✅ WhatsApp confirmation sent — PO: ${poNo}`);
+  console.log(`[Worker] ✅ Confirmation email sent — PO: ${poNo}`);
 }
 
 // =============================================================================
@@ -157,11 +158,11 @@ const worker = new Worker<ErpJobData>("erpQueue", processErpJob, {
   },
 });
 
-const waWorker = new Worker<WaJobData>("waQueue", processWaJob, {
+const emailWorker = new Worker<EmailJobData>("emailQueue", processEmailJob, {
   connection: createRedisConnection(),
   concurrency: 5,
   limiter: {
-    // Rate-limit outbound WhatsApp sends to stay under Fonnte's limits
+    // Rate-limit outbound emails to stay under Mailtrap's limits
     max: 10,
     duration: 1000, // max 10 jobs per second
   },
@@ -184,23 +185,23 @@ worker.on("error", (error) => {
   console.error("[Worker] Worker error:", error);
 });
 
-waWorker.on("completed", (job) => {
-  console.log(`[Worker] ✅ WA job ${job.id} completed`);
+emailWorker.on("completed", (job) => {
+  console.log(`[Worker] ✅ Email job ${job.id} completed`);
 });
 
-waWorker.on("failed", (job, error) => {
+emailWorker.on("failed", (job, error) => {
   console.error(
-    `[Worker] ❌ WA job ${job?.id} failed (attempt ${job?.attemptsMade}/${job?.opts.attempts}):`,
+    `[Worker] ❌ Email job ${job?.id} failed (attempt ${job?.attemptsMade}/${job?.opts.attempts}):`,
     error.message
   );
 });
 
-waWorker.on("error", (error) => {
-  console.error("[Worker] WA worker error:", error);
+emailWorker.on("error", (error) => {
+  console.error("[Worker] Email worker error:", error);
 });
 
 console.log("[Worker] 🚀 ERP queue worker started, listening for jobs...");
-console.log("[Worker] 🚀 WhatsApp queue worker started, listening for jobs...");
+console.log("[Worker] 🚀 Email queue worker started, listening for jobs...");
 
 // =============================================================================
 // GRACEFUL SHUTDOWN
@@ -210,7 +211,7 @@ async function shutdown(signal: string) {
   console.log(`[Worker] Received ${signal}. Shutting down gracefully...`);
 
   // Wait for the current job to finish before exiting
-  await Promise.all([worker.close(), waWorker.close()]);
+  await Promise.all([worker.close(), emailWorker.close()]);
 
   console.log("[Worker] Workers closed. Exiting.");
   process.exit(0);

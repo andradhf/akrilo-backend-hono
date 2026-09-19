@@ -33,9 +33,12 @@ const envSchema = z.object({
   ERP_SELLING_PRICE_LIST: z.string().default("Standard Selling"),
   ERP_CURRENCY: z.string().default("IDR"),
 
-  // Fonnte (WhatsApp)
-  FONNTE_TOKEN: z.string().min(1, "FONNTE_TOKEN is required"),
-  FONNTE_API_URL: z.string().url().default("https://api.fonnte.com/send"),
+  // Mailtrap (order confirmation email)
+  MAILTRAP_API_TOKEN: z.string().min(1, "MAILTRAP_API_TOKEN is required"),
+  MAILTRAP_INBOX_ID: z.string().min(1, "MAILTRAP_INBOX_ID is required"),
+  MAILTRAP_API_URL: z.string().url().default("https://sandbox.api.mailtrap.io"),
+  MAILTRAP_FROM_EMAIL: z.string().email().default("no-reply@akrilocreations.com"),
+  MAILTRAP_FROM_NAME: z.string().default("Akrilo Creations"),
   DESIGN_URL: z.string().url().default("https://design.akrilocreations.com"),
 
   // Server
