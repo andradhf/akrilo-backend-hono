@@ -1,12 +1,18 @@
 import { env } from "../lib/env";
 
 /**
- * Mailtrap Email Testing (sandbox) API client.
- * Docs: https://api-docs.mailtrap.io/docs/mailtrap-api-docs/
+ * Mailtrap API client — supports both Email Testing (sandbox) and
+ * Email Sending (production). Mode is controlled by env.MAILTRAP_MODE.
+ * Docs: https://docs.mailtrap.io/developers
  */
 
+const MAILTRAP_ENDPOINT =
+  env.MAILTRAP_MODE === "production"
+    ? "https://send.api.mailtrap.io/api/send"
+    : `https://sandbox.api.mailtrap.io/api/send/${env.MAILTRAP_INBOX_ID}`;
+
 /**
- * Sends an email via the Mailtrap sandbox Sending API.
+ * Sends an email via the Mailtrap API (sandbox or production per MAILTRAP_MODE).
  * Throws on HTTP failure or Mailtrap-reported failure, so BullMQ can retry.
  */
 export async function sendEmailMessage(to: string, subject: string, html: string): Promise<void> {
@@ -14,7 +20,7 @@ export async function sendEmailMessage(to: string, subject: string, html: string
   const timeout    = setTimeout(() => controller.abort(), 10_000);
 
   try {
-    const res = await fetch(`${env.MAILTRAP_API_URL}/api/send/${env.MAILTRAP_INBOX_ID}`, {
+    const res = await fetch(MAILTRAP_ENDPOINT, {
       method: "POST",
       headers: {
         Authorization:  `Bearer ${env.MAILTRAP_API_TOKEN}`,

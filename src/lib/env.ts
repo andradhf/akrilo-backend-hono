@@ -34,16 +34,24 @@ const envSchema = z.object({
   ERP_CURRENCY: z.string().default("IDR"),
 
   // Mailtrap (order confirmation email)
+  MAILTRAP_MODE: z.enum(["sandbox", "production"]).default("sandbox"),
   MAILTRAP_API_TOKEN: z.string().min(1, "MAILTRAP_API_TOKEN is required"),
-  MAILTRAP_INBOX_ID: z.string().min(1, "MAILTRAP_INBOX_ID is required"),
-  MAILTRAP_API_URL: z.string().url().default("https://sandbox.api.mailtrap.io"),
-  MAILTRAP_FROM_EMAIL: z.string().email().default("no-reply@akrilocreations.com"),
+  MAILTRAP_INBOX_ID: z.string().optional(),
+  MAILTRAP_FROM_EMAIL: z.string().email(),
   MAILTRAP_FROM_NAME: z.string().default("Akrilo Creations"),
   DESIGN_URL: z.string().url().default("https://design.akrilocreations.com"),
 
   // Server
   PORT: z.coerce.number().default(3000),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+}).superRefine((val, ctx) => {
+  if (val.MAILTRAP_MODE === "sandbox" && !val.MAILTRAP_INBOX_ID) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["MAILTRAP_INBOX_ID"],
+      message: "MAILTRAP_INBOX_ID wajib diisi saat MAILTRAP_MODE=sandbox",
+    });
+  }
 });
 
 const parsed = envSchema.safeParse(process.env);

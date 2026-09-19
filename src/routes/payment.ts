@@ -12,6 +12,7 @@ import { redisClient } from "../queue/connection";
 import { env } from "../lib/env";
 import { AppError } from "../middleware/error-handler";
 import { initiateRateLimiter } from "../middleware/rate-limit.middleware";
+import { validationHook } from "../lib/validation";
 import type {
   DokuWebhookPayload,
   InitiatePaymentResponse,
@@ -77,7 +78,7 @@ export const paymentRoutes = new Hono();
 paymentRoutes.post(
   "/initiate",
   initiateRateLimiter,
-  zValidator("json", initiatePaymentSchema),
+  zValidator("json", initiatePaymentSchema, validationHook),
   async (c) => {
     const body = c.req.valid("json");
 

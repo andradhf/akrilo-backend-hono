@@ -7,6 +7,7 @@ import { userDetail } from "../db/schema";
 import { registerOrGetCustomer } from "../services/erp.service";
 import { captchaMiddleware } from "../middleware/captcha.middleware";
 import { initiateRateLimiter } from "../middleware/rate-limit.middleware";
+import { validationHook } from "../lib/validation";
 
 // =============================================================================
 // VALIDATION SCHEMAS
@@ -44,7 +45,7 @@ userRoutes.post(
   "/initiate",
   initiateRateLimiter,       // Rate limit first
   captchaMiddleware,         // Then verify captcha
-  zValidator("json", userInitiateSchema),
+  zValidator("json", userInitiateSchema, validationHook),
   async (c) => {
     const body = c.req.valid("json");
 

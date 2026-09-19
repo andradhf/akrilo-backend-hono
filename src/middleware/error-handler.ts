@@ -33,7 +33,10 @@ export function errorHandler(err: Error, c: Context): Response {
       {
         success: false,
         error: "Validation failed",
-        details: err.flatten().fieldErrors,
+        details: err.issues.map((issue) => ({
+          field: issue.path.join("."),
+          message: issue.message,
+        })),
       },
       400
     );
